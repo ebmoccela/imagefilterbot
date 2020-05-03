@@ -1,0 +1,27 @@
+{
+  "name": "discord_bot_content_cop",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "discord.js": "^12.2.0",
+    "jimp": "^0.10.3",
+    "node-fetch": "^2.6.0",
+    "nsfwjs": "^2.1.0",
+    "sharp": "^0.25.2"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ebmoccela/imagefilterbot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ebmoccela/imagefilterbot/issues"
+  },
+  "homepage": "https://github.com/ebmoccela/imagefilterbot#readme",
+  "description": ""
+}
