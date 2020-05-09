@@ -1,4 +1,5 @@
 //import * as nsfwjs from "nsfwjs";
+let {PythonShell} = require('python-shell');
 const {Client, MessageAttachment, Collection, MessageEmbed} = require('discord.js');
 //var MessageAttachment = require('discord.js');
 const client = new Client();
@@ -226,23 +227,35 @@ function attachLink(msgAttachment){
 }
 
 //passes the embedded image to the scanner script
-function scanImage(the_image){
-    var spawn = require('child_process').spawn;
-    //var url = the_image.url;
+function scanImage(img_url){
+    // var spawn = require('child_process').spawn;
+    // //var url = the_image.url;
 
-    var process = spawn('python', ['./tensorflow/image_scan.py', the_image]);
+    // var process = spawn('python', ['./tensorflow/image_scan.py', the_image]);
 
-    process.stdout.on('data', (data) => {
-        console.log(`stdout: ${data}`);
-    });
+    // process.stdout.on('data', (data) => {
+    //     console.log(`stdout: ${data}`);
+    // });
 
-    process.stderr.on('data', (data) => {
-        console.log(`stderr: ${data}`);
-    });
+    // process.stderr.on('data', (data) => {
+    //     console.log(`stderr: ${data}`);
+    // });
 
-    process.on('close', (code) => {
-        console.log(`child process exited with code ${code}`);
-    });
+    // process.on('close', (code) => {
+    //     console.log(`child process exited with code ${code}`);
+    // });
+    var options = {
+        mode: 'text',
+        // pythonPath: 'usr/bin/python',
+        // pythonOptions: ['-u'],
+        //scriptPath: './image_scan_folder',
+        args: ['img_url']
+    };
+
+    PythonShell.run('./image_scan_folder/image_scan.py', options, function (err, results){
+        if(err) throw err;
+        console.log('finished');
+    })
 }
 
 // function ab2str(buf) {
