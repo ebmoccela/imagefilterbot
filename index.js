@@ -56,6 +56,7 @@ client.on('message', message => {
                     console.log(typeof img_url);
                 });
 
+                //make async if child process doesn't make it already
                 scanImage(img_url);
                 //const spawn = require('child_process').spawn;
                 //const pyProcess = spawn('python', ['./tensorflow/image_scan.py', img_url])
@@ -256,6 +257,8 @@ function scanImage(img_url){
         if(err) throw err;
         console.log('finished');
     })
+
+    //TODO: pass data back from python to node
 }
 
 // function ab2str(buf) {
