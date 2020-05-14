@@ -10,8 +10,10 @@ const PREFIX = '!';
 const tf = require('@tensorflow/tfjs');
 const tfnode = require('@tensorflow/tfjs-node');
 const nsfw = require('nsfwjs');
+const http = require('http')
 const Jimp = require('jimp');
 const path = require('path');
+const cron = require('cron');
 var is_image = false;
 var type_img;
 
@@ -26,10 +28,17 @@ for(const file of commandFiles){
     client.commands.set(command.name, command);
 }
 
+
 //check if bot is online
 client.on('ready', () => {
     console.log("the bot is ready.");
 });
+
+//need to get the time and location from user
+var job = new cron.CronJob('* * * * * *', function(){
+    console.log('message sent with cron');
+}, null, true, 'America/Los_Angeles');
+job.start();
 
 //these happen when the client sends a message
 client.on('message', message => {
@@ -56,78 +65,14 @@ client.on('message', message => {
                     console.log(typeof img_url);
                 });
 
+                
+
+                //save image to temp folder of images, pass the path of image to scan image
+                //store position first in first out
+                //delete image position from folder
+
                 //make async if child process doesn't make it already
-                scanImage(img_url);
-                //const spawn = require('child_process').spawn;
-                //const pyProcess = spawn('python', ['./tensorflow/image_scan.py', img_url])
-
-                // pyProcess.on('data', (data) => {
-                //     console.log('success: ' + data);
-                // });
-                // async function resize() {
-                //     // Read the image.
-                //     const sized_image = await Jimp.read({url: img_url});
-                //     // Resize the image to width 150 and heigth 150.
-                //     await sized_image.resize(224, 224);
-                //     // Save and overwrite the image
-                //     i = await sized_image.writeAsync(`./image/${Date.now()}_224x224` + type_img);
-                // }
-
-
-                // async function fn(){
-
-                //     //const pic;
-                    
-                //     //await resize();
-                    
-
-                //     // sharp(img_url)
-                //     //     .resize(224, 224)
-                //     //     .toFile('./image/' + img_url)
-                //     //     .then( results => {
-                //     //         console.log('wrote to file');
-                //     //         fs.writeFileSync('./image/' + img_url, results);
-                //     //     }).catch(err => {
-                //     //         console.log(err);
-                //     //     });
-
-                //     // var pic = await fs.readdirSync('./image/');
-                //     // pic.forEach(img_file => {
-                //     //     if(path.extname(img_file) == type_img){
-                //     //         //pic = i;
-                //     //         console.log('success');
-                //     //         pic = pic;
-                //     //     }
-                //     // });
-                //     //${Date.now()}_224x224` + type_img, (err, data) => {
-                //     //     if(err) throw err;
-                //     //     console.log(data);
-                //     // });
-
-                //     const pic = await i;
-                //     const model = await nsfw.load();
-
-                //     //const pic 
-                //     //const buf = await str2ab(pic);
-                //     //var data = await ab2str(buf);
-                //     //st
-                //     //var str64 = pic.toString('base64');
-                //     //var data = Buffer.from(str64, 'base64');
-                //     //var uintArray = Base64Binary.decode(data);  
-                //     //var byteArray = Base64Binary.decodeArrayBuffer(data); 
-
-                //     console.log(pic);
-                //     //const buf = await str2ab(pic);
-                //     //var uint8View = await new Uint8Array(i.data);
-
-                //     const image1 = await tfnode.node.decodeImage(pic);
-                //     // console.log(pic);
-                //     // console.log(typeof image1);
-                //     const pred = await model.classify(image1);
-                //     console.log(pred);
-                // }
-
-                // fn();
+                //scanImage(img_url);
 
                 // if(scanImage(img_url)){
                 //     console.log('python script ran');
@@ -135,9 +80,9 @@ client.on('message', message => {
 
                 //TODO: ADD A SCAN FOR IMAGES
                 //console.log("true");
-                message.delete()
-                    .then(message => console.log(`Deleted message ${message.author.username}`))
-                    .catch(console.error);
+                // message.delete()
+                //     .then(message => console.log(`Deleted message ${message.author.username}`))
+                //     .catch(console.error);
 
             } else {
                 console.log("false");
@@ -169,6 +114,8 @@ client.on('message', message => {
             console.log("false");
         }
     }
+
+    //ask for weather
 
     switch(args[0]){
         case "ping":
@@ -229,50 +176,32 @@ function attachLink(msgAttachment){
 
 //passes the embedded image to the scanner script
 function scanImage(img_url){
-    // var spawn = require('child_process').spawn;
-    // //var url = the_image.url;
 
-    // var process = spawn('python', ['./tensorflow/image_scan.py', the_image]);
 
-    // process.stdout.on('data', (data) => {
-    //     console.log(`stdout: ${data}`);
+    // PythonShell.run('./image_scan_folder/image_scan.py', options, function (err, results){
+    //     if(err) throw err;
+    //     console.log('finished');
     // });
 
-    // process.stderr.on('data', (data) => {
-    //     console.log(`stderr: ${data}`);
-    // });
+    let shell = new PythonShell('./image_scan_folder/image_scan.py');
+    shell.send(JSON.stringify(img_url));
 
-    // process.on('close', (code) => {
-    //     console.log(`child process exited with code ${code}`);
-    // });
-    var options = {
-        mode: 'text',
-        // pythonPath: 'usr/bin/python',
-        // pythonOptions: ['-u'],
-        //scriptPath: './image_scan_folder',
-        args: ['img_url']
-    };
+    shell.on('message', function(message){
+        console.log('the message: %j', message);
+    });
 
-    PythonShell.run('./image_scan_folder/image_scan.py', options, function (err, results){
+    shell.end(function(err){
         if(err) throw err;
         console.log('finished');
-    })
+    });
+
 
     //TODO: pass data back from python to node
-}
+};
 
-// function ab2str(buf) {
-//     return String.fromCharCode.apply(null, new Uint8Array(buf));
-// }
-
-// function str2ab(str) {
-//     var buf = new ArrayBuffer(str.length*2); // 2 bytes for each char
-//     var bufView = new Uint8Array(buf);
-//     for (var i=0, strLen=str.length; i < strLen; i++) {
-//       bufView[i] = str.charCodeAt(i);
-//     }
-//     return buf;
-// }
+function test(){
+    console.log("action executed");
+};
 
 
 client.login(TOKEN);
@@ -287,3 +216,10 @@ client.login(TOKEN);
 */
 
 //cayden pull top image from reddit
+
+
+/*
+weather api
+1. use cron so it can go off at set time
+2. use open weather
+*/
