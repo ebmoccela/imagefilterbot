@@ -10,10 +10,11 @@ const PREFIX = '!';
 const tf = require('@tensorflow/tfjs');
 const tfnode = require('@tensorflow/tfjs-node');
 const nsfw = require('nsfwjs');
-const http = require('http')
+const https = require('https')
 const Jimp = require('jimp');
 const path = require('path');
 const cron = require('cron');
+const spawn = require('child_process');
 var is_image = false;
 var type_img;
 
@@ -35,64 +36,66 @@ client.on('ready', () => {
 });
 
 //need to get the time and location from user
-var job = new cron.CronJob('* * * * * *', function(){
-    console.log('message sent with cron');
-}, null, true, 'America/Los_Angeles');
-job.start();
+// var job = new cron.CronJob('* * * * * *', function(){
+//     console.log('message sent with cron');
+// }, null, true, 'America/Los_Angeles');
+//job.start(); //starts the job
 
 //these happen when the client sends a message
 client.on('message', message => {
+    //TODO: add exception for reddit links
     let args = message.content.substring(PREFIX.length).split(" ");
     let img_args = message.attachments;
 
-    
-
+    //console.log(message.channel.nsfw);
     //checks if the image is directly linked
-    if(img_args.size > 0) {
+    if(img_args.size > 0 && !(message.channel.nsfw)) {  //may need to add check for embeds
         if(img_args.every(attachImage)){
             if(is_image){
 
-                /*
-                1. download and save the image
-                2. send image to script
-                3. either delete or add to training set
-                */
-                var img_url;
-                //var i;
+                var img_path;
+                var img_safe;
 
                 img_args.forEach(attachments => {
-                    img_url = attachments.url;
-                    console.log(typeof img_url);
+
+                    try{
+
+                        (async() => { 
+                            img_path = await saveImg(attachments);
+                            // message.delete()
+                            //     .then(message => console.log(`Deleted message ${message.author.username}`))
+                            //     .catch(console.error);
+                            //console.log(typeof img_path);
+                            //(async() => {
+                               img_safe = await scanImage(img_path);
+                               console.log(img_safe)
+                               if(img_safe){
+                                   console.log("img is safe");
+                               }
+                            //})();
+                              //check if img is safe or unsafe
+                            // if(img_safe){
+                            //     //post image
+                            //     var img_attachment = new MessageAttachment(attachments.url);
+                            //     message.channel.send(img_attachment)
+                            //         .then(message => console.log(`Sending image using ${img_attachment.url}`))
+                            //         .catch(console.error);
+                            // }
+                        })();
+
+                    } catch(e) {
+                        console.log(e.stack);
+                    }
                 });
 
-                
-
                 //save image to temp folder of images, pass the path of image to scan image
-                //store position first in first out
-                //delete image position from folder
-
-                //make async if child process doesn't make it already
-                //scanImage(img_url);
-
-                // if(scanImage(img_url)){
-                //     console.log('python script ran');
-                // }
 
                 //TODO: ADD A SCAN FOR IMAGES
                 //console.log("true");
-                // message.delete()
-                //     .then(message => console.log(`Deleted message ${message.author.username}`))
-                //     .catch(console.error);
 
             } else {
                 console.log("false");
             }
-
-            ///////gets the image and posts the image again
-            // var img_attachment = new MessageAttachment(img_url);
-            // message.channel.send(img_attachment)
-            //     .then(message => console.log(`Sending image using ${img_attachment.url}`))
-            //     .catch(console.error);
         }
     }
 
@@ -100,11 +103,6 @@ client.on('message', message => {
     if(args.length > 0 && !(img_args.size > 0)){
         attachLink(message.content)
         if(is_image){
-
-            // if(scanImage(message.content)){ //scanImage with python script
-            //     console.log('python script ran');
-            // };
-
             //TODO: ADD A SCAN FOR IMAGES
             //console.log("true");
             message.delete()
@@ -175,34 +173,112 @@ function attachLink(msgAttachment){
 }
 
 //passes the embedded image to the scanner script
-function scanImage(img_url){
+function scanImage(img_path){
+    var safe;
+    var unsafe;
+    try{
+        //https://stackoverflow.com/questions/45327365/sending-multiple-respone-from-nodejs-using-python-shell
+        let shell = new PythonShell('./image_scan_folder/image_scan.py');
+        //console.log(img_path);
+        //console.log(typeof img_path);
+        
+        //return new Promise(async function(resolve, reject){
+            shell.send(JSON.stringify(img_path));
 
+            shell.on('message', function(message){
+                //console.log('the message: %j', message);
+                newmessage = message.replace(img_path, "");
+                console.log(newmessage);
+                submessage = newmessage.substring(6, newmessage.length - 2)
+                //console.log(submessage);
+                messagesplit = submessage.split(",");
+                //console.log(messagesplit);
+                /*
+                check here for invalid safe and unsafe values
+                 */
+                unsafe = messagesplit[0].toString();
+                safe = messagesplit[1].toString();
+                unsafe = unsafe.slice(10);
+                safe = safe.slice(9);
+                console.log("safe: " + safe);
+                console.log("unsafe: " + unsafe);
+                if(safe >= unsafe){
+                    console.log("the image is safe");
+                    return img_safe = true;
+                } else {
+                    console.log("the image is not safe");
+                    return img_safe = false;
+                }
+    
+            });
 
-    // PythonShell.run('./image_scan_folder/image_scan.py', options, function (err, results){
-    //     if(err) throw err;
-    //     console.log('finished');
-    // });
+        //})
 
-    let shell = new PythonShell('./image_scan_folder/image_scan.py');
-    shell.send(JSON.stringify(img_url));
+        shell.end(function(err){
 
-    shell.on('message', function(message){
-        console.log('the message: %j', message);
-    });
+            if(err) throw err;
+            console.log('finished');
+        });
 
-    shell.end(function(err){
-        if(err) throw err;
-        console.log('finished');
-    });
-
-
-    //TODO: pass data back from python to node
+    } catch(err){
+        console.log(err)
+    }
 };
 
 function test(){
     console.log("action executed");
 };
 
+function checkPNGImage(base64string){
+
+    var src = base64string
+    var imageData = Uint8Array.from((src.replace('data:image/png;base64,', '')), c => c.charCodeAt(0), 'base64').toString('base64');
+    var sequence = [0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130]; // in hex: 
+    
+    //check last 12 elements of array so they contains needed values
+    for (var i = 12; i > 0; i--){
+        if (imageData[imageData.length - i] !== sequence[12-i]) {
+            console.log("image bad");
+                return false;
+        }
+    }
+    console.log('image good');
+    return true;
+}
+
+function base64_encode(file) {
+    var path;
+   return path = fs.readFileSync(file, { encoding: 'base64' });
+}
+
+async function saveImg(img){
+    try{
+        const image = await Jimp.read(img.url);
+        img_path = `./images/${img.url}`;
+        ensureDirectoryExistence(img_path);
+        //await fs.writeFileSync(`./images/${img.name}`, img.file);
+        await image.writeAsync(`./images/${img.url}`);
+        console.log(img_path);
+        console.log(typeof img_path);
+        return img_path;
+    }catch(err){
+        console.log(err)
+    }
+}
+
+
+function ensureDirectoryExistence(filePath) {
+    var dirname = path.dirname(filePath);
+    try{
+        if (fs.existsSync(dirname)) {
+        return true;
+        }
+        ensureDirectoryExistence(dirname);
+        fs.mkdirSync(dirname);
+    }catch(err){
+        console.log(err)
+    }
+}
 
 client.login(TOKEN);
 
