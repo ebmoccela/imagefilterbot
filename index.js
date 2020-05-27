@@ -1,8 +1,10 @@
 //import * as nsfwjs from "nsfwjs";
 let {PythonShell} = require('python-shell');
-const {Client, MessageAttachment, Collection, MessageEmbed} = require('discord.js');
+const discord = require('discord.js');
+//const {Client, Discord, MessageAttachment, Collection, MessageEmbed} = require('discord.js');
 //var MessageAttachment = require('discord.js');
-const client = new Client();
+const client = new discord.Client();
+//mconst discord = new Discord();
 const fetch = require('node-fetch');
 //const spawn = require('child_process');
 const TOKEN = "NzA1MTM4NjAzMjc3Mjg3NTE1.XqnW7Q.LibqYobOJT2WNuDxQcbi2uASrzU";
@@ -20,7 +22,7 @@ var type_img;
 
 //setting up commands folder
 const fs = require('fs');
-client.commands = new Collection();
+client.commands = new discord.Collection();
 
 const commandFiles = fs.readdirSync('./commands/').filter(filer => filer.endsWith('.js'));
 for(const file of commandFiles){
@@ -47,71 +49,37 @@ client.on('message', message => {
     let args = message.content.substring(PREFIX.length).split(" ");
     let img_args = message.attachments;
 
-    //console.log(message.channel.nsfw);
-    //checks if the image is directly linked
+    //TODO: check if image is embeded, linked, and pasted
+
+    //TODO: create a function for this
     if(img_args.size > 0 && !(message.channel.nsfw)) {  //may need to add check for embeds
         if(img_args.every(attachImage)){
-            if(is_image){
 
-                var img_path;
-                var img_safe;
-
-                img_args.forEach(attachments => {
-
-                    try{
-
-                        (async() => { 
-                            img_path = await saveImg(attachments);
-                            // message.delete()
-                            //     .then(message => console.log(`Deleted message ${message.author.username}`))
-                            //     .catch(console.error);
-                            //console.log(typeof img_path);
-                            //(async() => {
-                               img_safe = await scanImage(img_path);
-                               console.log(img_safe)
-                               if(img_safe){
-                                   console.log("img is safe");
-                               }
-                            //})();
-                              //check if img is safe or unsafe
-                            // if(img_safe){
-                            //     //post image
-                            //     var img_attachment = new MessageAttachment(attachments.url);
-                            //     message.channel.send(img_attachment)
-                            //         .then(message => console.log(`Sending image using ${img_attachment.url}`))
-                            //         .catch(console.error);
-                            // }
-                        })();
-
-                    } catch(e) {
-                        console.log(e.stack);
-                    }
-                });
-
-                //save image to temp folder of images, pass the path of image to scan image
-
-                //TODO: ADD A SCAN FOR IMAGES
-                //console.log("true");
-
-            } else {
-                console.log("false");
+            //currently checks if the image is copied, doesn't work with embeds
+            checkImage(img_args, message);
+        }
+    }else if (message.embeds.length > 0 && !(message.channel.nsfw)) {
+        var img_embed = message.embeds[0];
+        var embed_image_url = img_embed.url;
+        //var embed_thumbnail_url = img_embed.thumbnail.url;
+        //var embed_arg = img_embed.image.url.substring(PREFIX.length).split(" ");
+        if(embed_image_url !== null){
+            console.log("image is embed");
+            if(attachLink(embed_image_url)){
+                //checkEImage(img_embed, message);
+                checkEmbedImage(embed_image_url, message);
             }
+            // if(attachLink(embed_url)){
+            //     checkImage(img_embed, message);
+            // }
+        // }else if(embed_thumbnail_url !== null){
+        //     console.log("image thumbnail");
         }
     }
 
     //checks the url
-    if(args.length > 0 && !(img_args.size > 0)){
-        attachLink(message.content)
-        if(is_image){
-            //TODO: ADD A SCAN FOR IMAGES
-            //console.log("true");
-            message.delete()
-                .then(message => console.log(`Deleted message from ${message.author.username}`))
-                .catch(console.error);
-        } else {
-            console.log("false");
-        }
-    }
+
+    
 
     //ask for weather
 
@@ -174,99 +142,91 @@ function attachLink(msgAttachment){
 
 //passes the embedded image to the scanner script
 function scanImage(img_path){
-    var safe;
-    var unsafe;
     try{
-        //https://stackoverflow.com/questions/45327365/sending-multiple-respone-from-nodejs-using-python-shell
-        let shell = new PythonShell('./image_scan_folder/image_scan.py');
-        //console.log(img_path);
-        //console.log(typeof img_path);
-        
-        //return new Promise(async function(resolve, reject){
+        return new Promise((resolve, reject) => {
+            let result;
+            let shell = new PythonShell('./image_scan_folder/image_scan.py');
+            
             shell.send(JSON.stringify(img_path));
 
-            shell.on('message', function(message){
-                //console.log('the message: %j', message);
-                newmessage = message.replace(img_path, "");
-                console.log(newmessage);
-                submessage = newmessage.substring(6, newmessage.length - 2)
-                //console.log(submessage);
-                messagesplit = submessage.split(",");
-                //console.log(messagesplit);
-                /*
-                check here for invalid safe and unsafe values
-                 */
-                unsafe = messagesplit[0].toString();
-                safe = messagesplit[1].toString();
-                unsafe = unsafe.slice(10);
-                safe = safe.slice(9);
-                console.log("safe: " + safe);
-                console.log("unsafe: " + unsafe);
-                if(safe >= unsafe){
-                    console.log("the image is safe");
-                    return img_safe = true;
-                } else {
-                    console.log("the image is not safe");
-                    return img_safe = false;
-                }
-    
+            shell.on('message', function (message){
+                result = message;
+            });
+            
+            shell.on('stderr', function (stderr) {
+                console.log(stderr);
             });
 
-        //})
+            shell.end(function (err, code, signal) {
+                if(err) reject(err);
+                console.log('exit code was:' + code);
+                console.log('exit signal was:' + signal);
+                console.log('finished');
+                resolve(result);
+                console.log(result);
+            });
 
-        shell.end(function(err){
-
-            if(err) throw err;
-            console.log('finished');
         });
-
-    } catch(err){
-        console.log(err)
+    } catch (err) {
+        console.log(err);
     }
-};
+}
 
-function test(){
-    console.log("action executed");
-};
+//may still need conversions for pictures
 
-function checkPNGImage(base64string){
+// function checkPNGImage(base64string){
 
-    var src = base64string
-    var imageData = Uint8Array.from((src.replace('data:image/png;base64,', '')), c => c.charCodeAt(0), 'base64').toString('base64');
-    var sequence = [0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130]; // in hex: 
+//     var src = base64string
+//     var imageData = Uint8Array.from((src.replace('data:image/png;base64,', '')), c => c.charCodeAt(0), 'base64').toString('base64');
+//     var sequence = [0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130]; // in hex: 
     
-    //check last 12 elements of array so they contains needed values
-    for (var i = 12; i > 0; i--){
-        if (imageData[imageData.length - i] !== sequence[12-i]) {
-            console.log("image bad");
-                return false;
-        }
-    }
-    console.log('image good');
-    return true;
-}
+//     //check last 12 elements of array so they contains needed values
+//     for (var i = 12; i > 0; i--){
+//         if (imageData[imageData.length - i] !== sequence[12-i]) {
+//             console.log("image bad");
+//                 return false;
+//         }
+//     }
+//     console.log('image good');
+//     return true;
+// }
 
-function base64_encode(file) {
-    var path;
-   return path = fs.readFileSync(file, { encoding: 'base64' });
-}
+// function base64_encode(file) {
+//     var path;
+//    return path = fs.readFileSync(file, { encoding: 'base64' });
+// }
 
+//saves images
 async function saveImg(img){
     try{
-        const image = await Jimp.read(img.url);
-        img_path = `./images/${img.url}`;
-        ensureDirectoryExistence(img_path);
-        //await fs.writeFileSync(`./images/${img.name}`, img.file);
-        await image.writeAsync(`./images/${img.url}`);
-        console.log(img_path);
-        console.log(typeof img_path);
-        return img_path;
+        var image = img.url;
+        if(typeof image !== 'undefined'){
+            image = await Jimp.read(img.url);
+            img_path = `./temp_images/${img.url}`;
+            ensureDirectoryExistence(img_path);
+            //await fs.writeFileSync(`./images/${img.name}`, img.file);
+            await image.writeAsync(`./temp_images/${img.url}`);
+            // console.log(img_path);
+            // console.log(typeof img_path);
+            return img_path;
+        } else {
+            image = img;
+            image = await Jimp.read(img);
+            img_path = `./temp_images/${img}`;
+            ensureDirectoryExistence(img_path);
+            //await fs.writeFileSync(`./images/${img.name}`, img.file);
+            await image.writeAsync(`./temp_images/${img}`);
+            // console.log(img_path);
+            // console.log(typeof img_path);
+            return img_path;
+        }
+
     }catch(err){
-        console.log(err)
+        console.log(err);
     }
 }
 
-
+//makes checks if directories exists if not makes one
 function ensureDirectoryExistence(filePath) {
     var dirname = path.dirname(filePath);
     try{
@@ -278,6 +238,140 @@ function ensureDirectoryExistence(filePath) {
     }catch(err){
         console.log(err)
     }
+}
+
+function checkImage(img_args, message) {
+    var img_path;
+    var scan_return;
+    var img_score;
+
+    if(message.author.bot){
+        return;
+    } else if (message.author.bot){
+    
+    img_args.forEach(attachments => {
+
+        try{
+
+            (async() => { 
+                img_path = await saveImg(attachments);
+
+                message.delete()
+                    .then(message => console.log(`Deleted message ${message.author.username}`))
+                    .catch(console.error);
+
+                scan_return = await scanImage(img_path);
+                console.log("the image safe:" + scan_return);
+                //^^^^above code should work
+                scan_return = scan_return.replace(img_path, "");
+                //console.log(scan_return);   //example output should be {'': {'unsafe': 0.99, 'safe': 0.01}}
+                scan_return = scan_return.substring(6, scan_return.length - 2)
+                //console.log(scan_return);  //example output should be 'unsafe': 0.99, 'safe': 0.01
+                scan_return = scan_return.split(",");
+                //console.log(scan_return);  //array with two values, index 1 being the highest.
+
+                img_score = scan_return[1].toString();
+                if(img_score.indexOf("unsafe") !== -1){
+                    console.log("image is not safe");
+                    //PM score of image and christain server image.
+                    try{
+                        const attachment = new discord.MessageAttachment('./images/joey_wheeler.jpeg', 'joey_wheeler.jpeg');
+                        const my_embed_four = new discord.MessageEmbed()
+                            .setDescription('Your image has been banished to the Shadow Realm!')
+                            .attachFiles([attachment])
+                            .setImage('attachment://joey_wheeler.jpeg');
+                        await message.author.send(my_embed_four);
+                    } catch(err){
+                        console.log(err);
+                    }
+
+                } else {
+                    console.log("image is safe");
+                    //repost image
+                    var img_response = img_path.slice(14, img_path.length);
+                    const my_embed_two = new discord.MessageEmbed()
+                    .setDescription(`${message.author}'s image was found appropriate.`)
+                    .setColor('#FF69B4')
+                    .setURL(img_response)
+                    //.attachFiles([attachment])
+                    .setImage(img_response);
+                    await message.channel.send(my_embed_two);
+
+                await message.channel.send(my_embed_two);
+                //TODO add delete for images in temp folder
+                }
+            })();
+
+        } catch(e) {
+            console.log(e.stack);
+        }
+    });
+}
+}
+
+function checkEmbedImage(img_args, message){
+    var img_path;
+    //var img_resp = img_args;
+    var scan_return;
+    var img_score;
+
+    if(message.author.bot){
+        return;
+    }else if (!message.author.bot){
+
+    try{
+
+        (async() => { 
+            img_path = await saveImg(img_args);
+
+            message.delete()
+                .then(message => console.log(`Deleted message ${message.author.username}`))
+                .catch(console.error);
+
+            scan_return = await scanImage(img_path);
+            console.log("the image safe:" + scan_return);
+            //^^^^above code should work
+            scan_return = scan_return.replace(img_path, "");
+            //console.log(scan_return);   //example output should be {'': {'unsafe': 0.99, 'safe': 0.01}}
+            scan_return = scan_return.substring(6, scan_return.length - 2)
+            //console.log(scan_return);  //example output should be 'unsafe': 0.99, 'safe': 0.01
+            scan_return = scan_return.split(",");
+            //console.log(scan_return);  //array with two values, index 1 being the highest.
+
+            img_score = scan_return[1].toString();
+            if(img_score.indexOf("unsafe") !== -1){
+                console.log("image is not safe");
+                //PM score of image and christain server image.
+                try{
+                    const attachment = new discord.MessageAttachment('./images/joey_wheeler.jpeg', 'joey_wheeler.jpeg');
+                    const my_embed_three = new discord.MessageEmbed()
+                        .setDescription('Your image has been banished to the Shadow Realm!')
+                        .attachFiles([attachment])
+                        .setImage('attachment://joey_wheeler.jpeg');
+                    await message.author.send(my_embed_three);
+                }catch(err){
+                    console.log(err);
+                }
+            } else {
+                console.log("image is safe");
+                //const attachment = new discord.MessageAttachment(img, 'joey_wheeler.jpeg');
+                const my_embed_one = new discord.MessageEmbed()
+                    .setDescription(`${message.author}'s image was found appropriate.`)
+                    .setColor('#FF69B4')
+                    .setURL(img_args)
+                    //.attachFiles([attachment])
+                    .setImage(img_args);
+                    await message.channel.send(my_embed_one);
+
+                await message.channel.send(my_embed_one);
+                //TODO: add delete for images in temp folder
+            }
+    })();
+
+    } catch(e) {
+        console.log(e.stack);
+    }
+}
 }
 
 client.login(TOKEN);
