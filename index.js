@@ -7,19 +7,21 @@ const client = new discord.Client();
 //mconst discord = new Discord();
 const fetch = require('node-fetch');
 //const spawn = require('child_process');
-const TOKEN = "NzA1MTM4NjAzMjc3Mjg3NTE1.XqnW7Q.LibqYobOJT2WNuDxQcbi2uASrzU";
-const PREFIX = '!';
-const tf = require('@tensorflow/tfjs');
-const tfnode = require('@tensorflow/tfjs-node');
-const nsfw = require('nsfwjs');
+const {token, prefix} = require('./config.json');
+//const PREFIX = require('./config.json');
+//const tf = require('@tensorflow/tfjs');
+//const tfnode = require('@tensorflow/tfjs-node');
+//const nsfw = require('nsfwjs');
 const https = require('https')
 const Jimp = require('jimp');
 const path = require('path');
 const cron = require('cron');
-const spawn = require('child_process');
+var rmdir = require('rimraf');
+//const spawn = require('child_process');
 var is_image = false;
 var type_img;
 
+//TODO: look into env.config 
 //setting up commands folder
 const fs = require('fs');
 client.commands = new discord.Collection();
@@ -45,20 +47,22 @@ client.on('ready', () => {
 
 //these happen when the client sends a message
 client.on('message', message => {
+
+    if(message.author.bot) return;
     //TODO: add exception for reddit links
-    let args = message.content.substring(PREFIX.length).split(" ");
+    let args = message.content.substring(prefix.length).split(" ");
     let img_args = message.attachments;
 
     //TODO: check if image is embeded, linked, and pasted
 
     //TODO: create a function for this
-    if(img_args.size > 0 && !(message.channel.nsfw)) {  //may need to add check for embeds
+    if(img_args.size > 0 && !(message.channel.nsfw) && !(message.author.bot)) {  //may need to add check for embeds
         if(img_args.every(attachImage)){
 
             //currently checks if the image is copied, doesn't work with embeds
             checkImage(img_args, message);
         }
-    }else if (message.embeds.length > 0 && !(message.channel.nsfw)) {
+    }else if (message.embeds.length > 0 && !(message.channel.nsfw) && !(message.author.bot)) {
         var img_embed = message.embeds[0];
         var embed_image_url = img_embed.url;
         //var embed_thumbnail_url = img_embed.thumbnail.url;
@@ -66,7 +70,6 @@ client.on('message', message => {
         if(embed_image_url !== null){
             console.log("image is embed");
             if(attachLink(embed_image_url)){
-                //checkEImage(img_embed, message);
                 checkEmbedImage(embed_image_url, message);
             }
             // if(attachLink(embed_url)){
@@ -89,6 +92,7 @@ client.on('message', message => {
             client.commands.get('ping').execute(message, args);
         case "roll":
             //roll die
+            //add options for dnd die e.g 1 or 2 die, D4 - D20
             client.commands.get('roll').execute(message, args);
         break;
     }
@@ -141,6 +145,7 @@ function attachLink(msgAttachment){
 }
 
 //passes the embedded image to the scanner script
+// using https://github.com/notAI-tech/NudeNet
 function scanImage(img_path){
     try{
         return new Promise((resolve, reject) => {
@@ -247,7 +252,7 @@ function checkImage(img_args, message) {
 
     if(message.author.bot){
         return;
-    } else if (message.author.bot){
+    } else if (!message.author.bot){
     
     img_args.forEach(attachments => {
 
@@ -288,17 +293,36 @@ function checkImage(img_args, message) {
                 } else {
                     console.log("image is safe");
                     //repost image
+                    try{
                     var img_response = img_path.slice(14, img_path.length);
+                    const attachment = new discord.MessageAttachment(`${img_path}`, `${img_response}`);
                     const my_embed_two = new discord.MessageEmbed()
-                    .setDescription(`${message.author}'s image was found appropriate.`)
-                    .setColor('#FF69B4')
-                    .setURL(img_response)
-                    //.attachFiles([attachment])
-                    .setImage(img_response);
+                        .setDescription(`${message.author}'s image was found appropriate.`)
+                        .setColor('#FF69B4')
+                        //.setURL(img_response)
+                        .attachFiles([attachment])
+                        .setImage(`attachment://${img_response}`);
                     await message.channel.send(my_embed_two);
 
-                await message.channel.send(my_embed_two);
-                //TODO add delete for images in temp folder
+                    if(typeof img_path !== 'undefined'){
+                        //removeDir(img_path);
+                        //delete here
+                        try{
+                            deleteSavedImage(img_path);
+                        } catch (err) {
+                            console.log(err.stack);
+                        }
+
+
+                    }
+                    } catch (e){
+                        console.log(e.stack);
+                    }
+
+
+
+                //await message.channel.send(my_embed_two);
+
                 }
             })();
 
@@ -306,6 +330,8 @@ function checkImage(img_args, message) {
             console.log(e.stack);
         }
     });
+
+
 }
 }
 
@@ -320,7 +346,6 @@ function checkEmbedImage(img_args, message){
     }else if (!message.author.bot){
 
     try{
-
         (async() => { 
             img_path = await saveImg(img_args);
 
@@ -355,26 +380,88 @@ function checkEmbedImage(img_args, message){
             } else {
                 console.log("image is safe");
                 //const attachment = new discord.MessageAttachment(img, 'joey_wheeler.jpeg');
-                const my_embed_one = new discord.MessageEmbed()
-                    .setDescription(`${message.author}'s image was found appropriate.`)
-                    .setColor('#FF69B4')
-                    .setURL(img_args)
-                    //.attachFiles([attachment])
-                    .setImage(img_args);
-                    await message.channel.send(my_embed_one);
+                try{
+                    const my_embed_one = new discord.MessageEmbed()
+                        .setDescription(`${message.author}'s image was found appropriate.`)
+                        .setColor('#FF69B4')
+                        .setURL(img_args)
+                        //.attachFiles([attachment])
+                        .setImage(img_args);
+                        await message.channel.send(my_embed_one);
 
-                await message.channel.send(my_embed_one);
-                //TODO: add delete for images in temp folder
+                        //delete here
+                        if(typeof img_path !== 'undefined'){
+                            try{
+                                fs.unlinkSync(img_path);
+                            } catch(err) {
+                                console.log(err.stack);
+                            }
+                        }
+
+                        if(typeof img_path !== 'undefined') {
+                            try{
+                                deleteSavedImage(img_path);
+
+                            }catch(err){
+                                console.log(err.stack);
+                            }
+                        }
+                        
+                } catch (e) {
+                    console.log(e.stack);
+                }
+
+                //await message.channel.send(my_embed_one);
+                
             }
     })();
 
     } catch(e) {
         console.log(e.stack);
     }
+
+ 
 }
 }
 
-client.login(TOKEN);
+function removeDir(img_path){
+    if(!fs.existsSync(img_path)) {
+        console.log('got here');
+        return;
+    }
+    
+
+    var list = fs.readdirSync(img_path);
+    for(var i = 0; i < list.length; i++){
+        var filename = path.join(img_path, list[i]);
+        var stat = fs.statSync(filename);
+
+        if(filename == "." || filename == "..") {
+            //do nothing for current and parent dir
+        } else if (stat.isDirectory()){
+            removeDir(filename)
+        } else {
+            fs.unlinkSync(filename);
+        }
+    }
+    fs.rmdirSync(img_path);
+}
+
+//remove the image from the path here
+function deleteSavedImage(img_path){
+    //TODO: remove image from pathdde
+    console.log('\nCurrent filenames:');
+    fs.unlinkSync(img_path);
+    try{
+        fs.rmdirSync(img_path, {recursive: true});
+
+        console.log(`${img_path} is deleted`);
+    } catch (err) {
+        console.error(`Error while deleting ${img_path}`);
+    }
+}
+
+client.login(token);
 
 
 
