@@ -278,7 +278,7 @@ function checkImage(img_args, message) {
                 img_score = scan_return[1].toString();
                 if(img_score.indexOf("unsafe") !== -1){
                     console.log("image is not safe");
-                    //PM score of image and christain server image.
+                    //PM score of image
                     try{
                         const attachment = new discord.MessageAttachment('./images/joey_wheeler.jpeg', 'joey_wheeler.jpeg');
                         const my_embed_four = new discord.MessageEmbed()
@@ -366,7 +366,7 @@ function checkEmbedImage(img_args, message){
             img_score = scan_return[1].toString();
             if(img_score.indexOf("unsafe") !== -1){
                 console.log("image is not safe");
-                //PM score of image and christain server image.
+                //PM score of image
                 try{
                     const attachment = new discord.MessageAttachment('./images/joey_wheeler.jpeg', 'joey_wheeler.jpeg');
                     const my_embed_three = new discord.MessageEmbed()
